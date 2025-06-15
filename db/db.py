@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS manutencao (
     Torque_Nm REAL,
     Desgaste_Ferramenta_min INTEGER,
     Falha INTEGER,
-    Tipo_Falha TEXT
+    Tipo_Falha TEXT,
+    Data_Insercao TEXT DEFAULT (datetime('now', 'localtime'))
 )
 """)
-conn.commit()
 
-# Fechar conexão
+conn.commit()
 conn.close()
-print("✔️ Banco de dados e tabela criados com sucesso!")
+
+print("Banco de dados e tabela carregados com sucesso!")
