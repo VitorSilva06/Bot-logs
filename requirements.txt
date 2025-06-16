@@ -1,6 +1,9 @@
 certifi==2025.4.26
 charset-normalizer==3.4.2
+contourpy==1.3.2
+cycler==0.12.1
 defusedxml==0.7.1
+et_xmlfile==2.0.0
 fonttools==4.58.2
 fpdf2==2.8.3
 idna==3.10
@@ -12,10 +15,14 @@ packaging==25.0
 pandas==2.3.0
 pillow==11.2.1
 pyparsing==3.2.3
+PyQt5==5.15.9
+PyQt5-Qt5==5.15.2
+PyQt5_sip==12.17.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
 pytz==2025.2
 requests==2.32.4
+shiboken6==6.9.1
 six==1.17.0
 tzdata==2025.2
 urllib3==2.4.0

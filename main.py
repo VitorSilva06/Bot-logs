@@ -1,7 +1,9 @@
 import pandas as pd
-from db.db import db_name, sql, cursor
+from db.db import db_name, sql
 from time import sleep
 from datetime import datetime
+import matplotlib
+matplotlib.use('Agg')  # Gerar imagem sem interface gráfica. Corrige o erro de quando for montar os graficos
 from matplotlib import pyplot as plt
 from fpdf import FPDF
 import os
@@ -13,7 +15,6 @@ def carregar_dados(caminho_csv: str) -> pd.DataFrame:
     """Carrega e trata os dados do CSV."""
     df = pd.read_csv(caminho_csv)
 
-    # Renomear colunas
     df.rename(columns={
         'UDI': 'ID',
         'Product ID': 'ID_Produto',
@@ -27,7 +28,6 @@ def carregar_dados(caminho_csv: str) -> pd.DataFrame:
         'Failure Type': 'Tipo_Falha'
     }, inplace=True)
 
-    # Conversão de tipos
     df = df.astype({
         'ID': 'int',
         'ID_Produto': 'str',
@@ -41,19 +41,15 @@ def carregar_dados(caminho_csv: str) -> pd.DataFrame:
         'Tipo_Falha': 'str'
     })
 
-    # Remover coluna ID (se não for necessária)
     df.drop('ID', axis=1, inplace=True)
-    
     return df
 
 
-def verificar_nulos(df: pd.DataFrame, nome_tabela: str):
+def verificar_nulos(nome_tabela: str):
     """Consulta e exibe registros no banco que possuem valores nulos."""
-
     conn = sql.connect(db_name)
-    cursor = conn.cursor()
     data_atual = datetime.now()
-   
+
     query = f"""
     SELECT *
     FROM {nome_tabela}
@@ -75,11 +71,11 @@ def verificar_nulos(df: pd.DataFrame, nome_tabela: str):
 
     if not df_nulos.empty:
         print("Registros no banco com campos nulos:")
-        print(df_nulos)
     else:
         print("Nenhum valor nulo encontrado no banco.")
 
     return df_nulos
+
 
 def salvar_no_banco(df: pd.DataFrame, nome_tabela: str):
     """Salva o DataFrame no banco de dados."""
@@ -90,14 +86,14 @@ def salvar_no_banco(df: pd.DataFrame, nome_tabela: str):
     sleep(2)
     print("Dados carregados com sucesso!")
 
-def query_falhas(df: pd.DataFrame, nome_tabela: str):
-    """Faz uma consulta no banco e retorna um relatorio em pdf.
-    O pdf é encaminhado por email."""
+
+def query_falhas(nome_tabela: str):
+    """Consulta no banco os registros de falhas do dia."""
     data_atual = datetime.now()
     conn = sql.connect(db_name)
     query = f"""
     SELECT *
-    FROM manutencao
+    FROM {nome_tabela}
     WHERE Falha = 1
     AND date(Data_Insercao) = '{data_atual.strftime('%Y-%m-%d')}'
     ORDER BY Data_Insercao DESC;
@@ -106,10 +102,11 @@ def query_falhas(df: pd.DataFrame, nome_tabela: str):
     conn.close()
     return df
 
-def gerar_relatorio(df: pd.DataFrame, tabela: str, nome_pdf='relatorio.pdf'):
-    dados = query_falhas(df, tabela)
 
-    # --- Gráfico 1: Quantidade de Falhas ---
+def gerar_relatorio(tabela: str, nome_pdf='relatorio.pdf'):
+    dados = query_falhas(tabela)
+
+    # Gráfico 1: Quantidade de Falhas
     contagem = dados['Tipo_Falha'].value_counts()
     eixo_x = contagem.index
     eixo_y = contagem.values
@@ -124,7 +121,7 @@ def gerar_relatorio(df: pd.DataFrame, tabela: str, nome_pdf='relatorio.pdf'):
     plt.savefig(img1)
     plt.close()
 
-    # --- Tabela 1: Top 10 produtos ---
+    # Tabela: Top 10 produtos com mais falhas
     top10_tabela = dados['ID_Produto'].value_counts().head(10).reset_index()
     top10_tabela.columns = ['ID_Produto', 'Total_Falhas']
 
@@ -142,22 +139,22 @@ def gerar_relatorio(df: pd.DataFrame, tabela: str, nome_pdf='relatorio.pdf'):
     plt.savefig(img2)
     plt.close()
 
-    # --- Tabela 2: Estatísticas Descritivas ---
-    status = dados[['Temp_Ar_K', 'Temp_Processo_K', 'Velocidade_Rotacao_rpm', 'Torque_Nm', 'Desgaste_Ferramenta_min']].describe()
-    stats_transposta = status.T  
-    stats_filtradas = stats_transposta[['mean', 'min', 'max']]
+    # Tabela: Estatísticas Descritivas 
+    stats = dados[['Temp_Ar_K', 'Temp_Processo_K', 'Velocidade_Rotacao_rpm',
+                   'Torque_Nm', 'Desgaste_Ferramenta_min']].describe()
+    stats = stats.T[['mean', 'min', 'max']].round(2)
 
     fig, ax = plt.subplots(figsize=(10, 3))
     ax.axis('off')
     table = ax.table(
-        cellText=stats_filtradas.round(2).values,
-        rowLabels=stats_filtradas.index,
-        colLabels=stats_filtradas.columns,
+        cellText=stats.values,
+        rowLabels=stats.index,
+        colLabels=stats.columns,
         cellLoc='center',
         rowLoc='center',
         loc='center',
-        colColours=['#4F81BD']*len(stats_filtradas.columns),
-        rowColours=['#DCE6F1']*len(stats_filtradas.index)
+        colColours=['#4F81BD'] * 3,
+        rowColours=['#DCE6F1'] * len(stats)
     )
     plt.title('Estatísticas Descritivas', fontsize=16)
     plt.tight_layout()
@@ -165,48 +162,47 @@ def gerar_relatorio(df: pd.DataFrame, tabela: str, nome_pdf='relatorio.pdf'):
     plt.savefig(img3)
     plt.close()
 
-    # CRiando PDF
+    # --- Criar PDF ---
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
-    
-    # Página 1: Gráfico de falhas
+
     pdf.add_page()
     pdf.set_font("Helvetica", 'B', 16)
     pdf.cell(0, 10, 'Relatório Resumido de Falhas', ln=True, align='C')
     pdf.ln(10)
     pdf.image(img1, x=10, w=pdf.w - 20)
-    
-    # Página 2: Top 10 produtos
+
     pdf.add_page()
     pdf.set_font("Helvetica", 'B', 14)
     pdf.cell(0, 10, 'Top 10 Produtos com Mais Falhas', ln=True, align='C')
     pdf.ln(10)
     pdf.image(img2, x=20, w=pdf.w - 40)
 
-    # Página 3: Estatísticas Descritivas
     pdf.add_page()
     pdf.set_font("Helvetica", 'B', 14)
     pdf.cell(0, 10, 'Estatísticas Descritivas', ln=True, align='C')
     pdf.ln(10)
     pdf.image(img3, x=10, w=pdf.w - 20)
 
-    # Salva PDF
     pdf.output(nome_pdf)
     print(f"PDF salvo como {nome_pdf}")
 
-    # Apaga imagens temporárias
     os.remove(img1)
     os.remove(img2)
     os.remove(img3)
 
+    nulos = verificar_nulos('manutencao')
+    corpo = f'Segue o relatório gerado.\n\u26A0 Valores nulos encontrados:\n{nulos if not nulos.empty else "Nenhum"}'
+
     enviar_email(
-        destinatario=os.getenv('DESTINARIO_ENV'),
-        assunto='Relatório de Falahas',
-        corpo=f'Segue o relatório gerado.\n \u26A0 Valores nulos:{verificar_nulos(df, 'manutencao')}',
+        destinatario=os.getenv('DESTINATARIO_ENV'),
+        assunto='Relatório de Falhas',
+        corpo=corpo,
         pdf=nome_pdf,
         remetente=os.getenv('REMETENTE_ENV'),
-        senha= os.getenv('SENHA_ENV')
+        senha=os.getenv('SENHA_ENV')
     )
+    print('Email enviado com sucesso.')
 
 
 def enviar_email(destinatario, assunto, corpo, pdf, remetente, senha):
@@ -218,12 +214,8 @@ def enviar_email(destinatario, assunto, corpo, pdf, remetente, senha):
         mensagem.set_content(corpo)
 
         with open(pdf, 'rb') as f:
-            conteudo_pdf = f.read()
-            arquivo = os.path.basename(f.name)
-        
-        mensagem.add_attachment(conteudo_pdf, maintype='application', subtype='pdf', filename=arquivo)
+            mensagem.add_attachment(f.read(), maintype='application', subtype='pdf', filename=os.path.basename(pdf))
 
-        # Conectando ao Servidor SMTP
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(remetente, senha)
             smtp.send_message(mensagem)
@@ -232,11 +224,4 @@ def enviar_email(destinatario, assunto, corpo, pdf, remetente, senha):
         print("Erro ao enviar o e-mail:", e)
 
 
-def main():
-    df = carregar_dados('predictive_maintenance.csv')
-    salvar_no_banco(df, 'manutencao')
-    gerar_relatorio(df, 'manutencao')
 
-
-if __name__ == '__main__':
-    main()
