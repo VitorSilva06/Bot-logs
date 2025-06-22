@@ -13,7 +13,6 @@
 
 | Seleção de Arquivo | Análise de Dados | Relatório Gerado |
 |--------------------|------------------|------------------|
-| ![Selecionar CSV](https://via.placeholder.com/300x200?text=Selecionar+CSV) | ![Resumo de Falhas](https://via.placeholder.com/300x200?text=Resumo+de+Falhas) | ![PDF Gerado](https://via.placeholder.com/300x200?text=Relat%C3%B3rio+PDF) |
 
 ---
 
