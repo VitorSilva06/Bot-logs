@@ -4,12 +4,19 @@ import sys, os
 import pandas as pd
 import shutil
 from datetime import datetime
+
 from main import carregar_dados, salvar_no_banco, gerar_relatorio, query_falhas
+
+def recurso_caminho(relativo):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relativo)
+    return os.path.join(os.path.abspath("."), relativo)
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        uic.loadUi("interface.ui", self)
+        path_ui = recurso_caminho("interface.ui")
+        uic.loadUi(path_ui, self)
 
         self.btn_selecionar.clicked.connect(self.selecionar_arquivo)
         self.btn_analisar.clicked.connect(self.analisar_dados)
@@ -76,6 +83,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Relatório", "Relatório gerado e enviado com sucesso.")
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao gerar relatório:\n{e}")
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

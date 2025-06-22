@@ -9,6 +9,8 @@ from fpdf import FPDF
 import os
 import smtplib
 from email.message import EmailMessage
+from dotenv import load_dotenv
+
 
 
 def carregar_dados(caminho_csv: str) -> pd.DataFrame:
@@ -193,8 +195,11 @@ def gerar_relatorio(tabela: str, nome_pdf='relatorio.pdf'):
 
     nulos = verificar_nulos('manutencao')
     corpo = f'Segue o relatório gerado.\n\u26A0 Valores nulos encontrados:\n{nulos if not nulos.empty else "Nenhum"}'
+    
+    load_dotenv()
 
     enviar_email(
+        
         destinatario=os.getenv('DESTINATARIO_ENV'),
         assunto='Relatório de Falhas',
         corpo=corpo,
